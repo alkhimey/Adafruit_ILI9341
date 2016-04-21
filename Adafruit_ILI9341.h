@@ -16,6 +16,10 @@
 #ifndef _ADAFRUIT_ILI9341H_
 #define _ADAFRUIT_ILI9341H_
 
+#ifndef _WERECATF_DISPLAY_EXTENSIONS_
+#define _WERECATF_DISPLAY_EXTENSIONS_
+#endif
+
 #if ARDUINO >= 100
  #include "Arduino.h"
  #include "Print.h"
@@ -29,6 +33,7 @@
   #include <pgmspace.h>
 #endif
 
+#include <SPI.h>
 
 #if defined (__AVR__) || defined(TEENSYDUINO) || defined (__arm__) || defined (ESP8266)
 #define USE_FAST_PINIO
@@ -121,11 +126,12 @@ class Adafruit_ILI9341 : public Adafruit_GFX {
 
   Adafruit_ILI9341(int8_t _CS, int8_t _DC, int8_t _MOSI, int8_t _SCLK,
 		   int8_t _RST, int8_t _MISO);
-  Adafruit_ILI9341(int8_t _CS, int8_t _DC, int8_t _RST = -1);
+  Adafruit_ILI9341(int8_t _CS, int8_t _DC, int8_t _RST = -1, SPIClass *SPIdev=&SPI);
 
   void     begin(void),
            setAddrWindow(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1),
            pushColor(uint16_t color),
+           pushColors(uint16_t* buf, size_t n, bool littleEndian=true),
            fillScreen(uint16_t color),
            drawPixel(int16_t x, int16_t y, uint16_t color),
            drawFastVLine(int16_t x, int16_t y, int16_t h, uint16_t color),
@@ -133,28 +139,38 @@ class Adafruit_ILI9341 : public Adafruit_GFX {
            fillRect(int16_t x, int16_t y, int16_t w, int16_t h,
              uint16_t color),
            setRotation(uint8_t r),
+           drawLine(int16_t x0, int16_t y0,int16_t x1, int16_t y1, uint16_t color),
+           flipDisplay(bool vertical, bool horizontal),
+           flipVertical(),
+           flipHorizontal(),
            invertDisplay(boolean i);
-  uint16_t color565(uint8_t r, uint8_t g, uint8_t b);
 
-  /* These are not for current use, 8-bit protocol only! */
-  uint8_t  readdata(void),
-    readcommand8(uint8_t reg, uint8_t index = 0);
-  /*
-  uint16_t readcommand16(uint8_t);
-  uint32_t readcommand32(uint8_t);
-  void     dummyclock(void);
-  */
+           uint16_t color565(uint8_t r, uint8_t g, uint8_t b);
 
-  void     spiwrite(uint8_t),
-    writecommand(uint8_t c),
-    writedata(uint8_t d),
-    commandList(uint8_t *addr);
-  uint8_t  spiread(void);
+           /* These are not for current use, 8-bit protocol only! */
+           uint8_t readdata(void),
+           readcommand8(uint8_t reg, uint8_t index = 0);
+           /*
+           uint16_t readcommand16(uint8_t);
+           uint32_t readcommand32(uint8_t);
+           void     dummyclock(void);
+           */
+
+           void spiwrite(uint8_t),
+           writecommand(uint8_t c),
+           writedata(uint8_t d),
+           commandList(uint8_t *addr);
+           uint8_t  spiread(void);
 
  private:
-  uint8_t  tabcolor;
+           uint8_t  tabcolor;
+           SPIClass *_SPI;
+           bool _vertFlip=false;
+           bool _horzFlip=false;
 
-
+           void spiWriteBytes(uint8_t * data, uint32_t size, uint32_t repeat=1);
+           inline void spi_begin() __attribute__((always_inline));
+           inline void spi_end() __attribute__((always_inline));
 
   boolean  hwSPI;
 #if defined (__AVR__) || defined(TEENSYDUINO)
