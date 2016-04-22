@@ -35,7 +35,7 @@
 
 #include <SPI.h>
 
-#if defined (__AVR__) || defined(TEENSYDUINO) || defined (__arm__) || defined (ESP8266)
+#if defined (__AVR__) || defined(TEENSYDUINO) || defined (__arm__) || defined (ESP8266) || defined (__STM32F1__)
 #define USE_FAST_PINIO
 #endif
 
@@ -183,16 +183,16 @@ class Adafruit_ILI9341 : public Adafruit_GFX {
 //    volatile PORT_OUT_Type *mosiport, *clkport, *dcport, *rsport, *csport;
 //    int32_t  _cs, _dc, _rst, _mosi, _miso, _sclk;
 //    PORT_OUT_Type  mosipinmask, clkpinmask, cspinmask, dcpinmask;
+#elif defined (ESP8266) || defined (__STM32F1__)
+    volatile uint32_t *mosiport, *clkport, *dcport, *rsport, *csport;
+    int32_t  _cs, _dc, _rst, _mosi, _miso, _sclk;
+    uint32_t  mosipinmask, clkpinmask, cspinmask, dcpinmask;
 #elif defined (__arm__)
     volatile RwReg *mosiport, *clkport, *dcport, *rsport, *csport;
     int32_t  _cs, _dc, _rst, _mosi, _miso, _sclk;
     uint32_t  mosipinmask, clkpinmask, cspinmask, dcpinmask;
 #elif defined (ARDUINO_ARCH_ARC32)
     int8_t  _cs, _dc, _rst, _mosi, _miso, _sclk;
-#elif defined (ESP8266)
-    volatile uint32_t *mosiport, *clkport, *dcport, *rsport, *csport;
-    int32_t  _cs, _dc, _rst, _mosi, _miso, _sclk;
-    uint32_t  mosipinmask, clkpinmask, cspinmask, dcpinmask;
 #endif
 };
 

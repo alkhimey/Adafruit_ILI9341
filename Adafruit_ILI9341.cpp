@@ -34,6 +34,8 @@ inline void Adafruit_ILI9341::spi_begin(void){
   _SPI->beginTransaction(SPISettings(16000000, MSBFIRST, SPI_MODE0));
 #elif defined(ESP8266)
   _SPI->beginTransaction(SPISettings(ESP8266_CLOCK, MSBFIRST, SPI_MODE0));
+#elif defined(__STM32F1__)
+  _SPI->beginTransaction(SPISettings(36000000, MSBFIRST, SPI_MODE0));
 #else
     // max speed!
   _SPI->beginTransaction(SPISettings(24000000, MSBFIRST, SPI_MODE0));
@@ -193,7 +195,7 @@ void Adafruit_ILI9341::commandList(uint8_t *addr) {
 
 
 void Adafruit_ILI9341::begin(void) {
-  if (_rst > 0) {
+  if (_rst) {
     pinMode(_rst, OUTPUT);
     digitalWrite(_rst, LOW);
   }
@@ -219,6 +221,8 @@ void Adafruit_ILI9341::begin(void) {
     mySPCR = SPCR;
   #elif defined(ESP8266)
     _SPI->setFrequency(80000000);
+  #elif defined(__STM32F1__)
+    _SPI->setClockDivider(SPI_CLOCK_DIV2);
   #elif defined(TEENSYDUINO)
     _SPI->setClockDivider(SPI_CLOCK_DIV2); // 8 MHz (full! speed!)
   #elif defined (__arm__)
@@ -241,7 +245,7 @@ void Adafruit_ILI9341::begin(void) {
   }
 
   // toggle RST low to reset
-  if (_rst > 0) {
+  if (_rst) {
     digitalWrite(_rst, HIGH);
     delay(5);
     digitalWrite(_rst, LOW);
@@ -398,7 +402,23 @@ void Adafruit_ILI9341::setAddrWindow(uint16_t x0, uint16_t y0, uint16_t x1,
   digitalWrite(_dc, HIGH);
   #endif
 
-  spiWriteBytes(&buffC[0], sizeof(buffC));
+  if(hwSPI){
+  #ifdef ESP8266
+    _SPI->writePattern(&buffC[0], 4, 1);
+  #else
+    _SPI->transfer(buffC[0]);
+    _SPI->transfer(buffC[1]);
+    _SPI->transfer(buffC[2]);
+    _SPI->transfer(buffC[3]);
+  #endif
+  }
+  else {
+    spiwrite(buffC[0]);
+    spiwrite(buffC[1]);
+    spiwrite(buffC[2]);
+    spiwrite(buffC[3]);
+  }
+  //spiWriteBytes(&buffC[0], sizeof(buffC));
 
   #if defined(USE_FAST_PINIO)
   *dcport &= ~dcpinmask;
@@ -414,7 +434,25 @@ void Adafruit_ILI9341::setAddrWindow(uint16_t x0, uint16_t y0, uint16_t x1,
   digitalWrite(_dc, HIGH);
   #endif
 
-  spiWriteBytes(&buffP[0], sizeof(buffP));
+  *csport &= ~cspinmask;
+
+  if(hwSPI){
+  #ifdef ESP8266
+    _SPI->writePattern(&buffP[0], 4, 1);
+  #else
+    _SPI->transfer(buffP[0]);
+    _SPI->transfer(buffP[1]);
+    _SPI->transfer(buffP[2]);
+    _SPI->transfer(buffP[3]);
+  #endif
+  }
+  else {
+    spiwrite(buffP[0]);
+    spiwrite(buffP[1]);
+    spiwrite(buffP[2]);
+    spiwrite(buffP[3]);
+  }
+  //else spiWriteBytes(&buffP[0], sizeof(buffP));
 
   #if defined(USE_FAST_PINIO)
   *dcport &= ~dcpinmask;
@@ -435,23 +473,7 @@ void Adafruit_ILI9341::setAddrWindow(uint16_t x0, uint16_t y0, uint16_t x1,
   #else
   digitalWrite(_cs, HIGH);
   #endif
-  //This function is called so often it's best to squeeze as much performance out of it as possible
-  //And that means culling out some of the function calls
-/*  writecommand(ILI9341_CASET); // Column addr set
-  writedata(x0 >> 8);
-  writedata(x0 & 0xFF);     // XSTART 
-  writedata(x1 >> 8);
-  writedata(x1 & 0xFF);     // XEND
-
-  writecommand(ILI9341_PASET); // Row addr set
-  writedata(y0>>8);
-  writedata(y0);     // YSTART
-  writedata(y1>>8);
-  writedata(y1);     // YEND
-
-  writecommand(ILI9341_RAMWR); // write to RAM*/
 }
-
 
 void Adafruit_ILI9341::pushColor(uint16_t color) {
   if (hwSPI) spi_begin();
@@ -527,6 +549,13 @@ void Adafruit_ILI9341::drawFastVLine(int16_t x, int16_t y, int16_t h,
 #endif
 
   uint8_t colorBin[] = { (uint8_t) (color >> 8), (uint8_t) color };
+#if defined (__STM32F1__)
+  if(hwSPI){
+    _SPI->setDataSize (SPI_CR1_DFF); // Set SPI 16bit mode
+    _SPI->dmaSend(&color, h, 0);
+    _SPI->setDataSize (0);
+  } else
+#endif
   spiWriteBytes(&colorBin[0], 2, h);
 
 #if defined(USE_FAST_PINIO)
@@ -558,6 +587,13 @@ void Adafruit_ILI9341::drawFastHLine(int16_t x, int16_t y, int16_t w,
 #endif
 
   uint8_t colorBin[] = { (uint8_t) (color >> 8), (uint8_t) color };
+#if defined (__STM32F1__)
+  if(hwSPI){
+    _SPI->setDataSize (SPI_CR1_DFF); // Set SPI 16bit mode
+    _SPI->dmaSend(&color, w, 0);
+    _SPI->setDataSize (0);
+  } else
+#endif
   spiWriteBytes(&colorBin[0], 2, w);
 
 #if defined(USE_FAST_PINIO)
@@ -595,6 +631,18 @@ void Adafruit_ILI9341::fillRect(int16_t x, int16_t y, int16_t w, int16_t h,
 #endif
 
   uint8_t colorBin[] = { (uint8_t) (color >> 8), (uint8_t) color };
+#if defined (__STM32F1__)
+  if(hwSPI){
+    _SPI->setDataSize (SPI_CR1_DFF); // Set spi 16bit mode
+    if (w*h <= 65535)
+      _SPI->dmaSend(&color, (w*h), 0);
+    else {
+      _SPI->dmaSend(&color, (65535), 0);
+      _SPI->dmaSend(&color, ((w*h) - 65535), 0);
+    }
+    _SPI->setDataSize (0);
+  } else
+#endif
   spiWriteBytes(&colorBin[0], 2, w*h);
 
 #if defined(USE_FAST_PINIO)
@@ -744,6 +792,53 @@ void Adafruit_ILI9341::spiWriteBytes(uint8_t * data, uint32_t size, uint32_t rep
     }
   }
   else
+  #elif defined (__STM32F1__)
+  uint16 temp;
+  uint16 *ptr=(uint16 *)data;
+  if(hwSPI){
+      //Setup DMA to send the same word over and over for repeat times
+      if(size==2 && repeat > 8){
+        temp=(ptr[0] >> 8) | (ptr[0] << 8);
+        _size=repeat;
+        _SPI->setDataSize (SPI_CR1_DFF);
+        while(_size > 65535){
+          _SPI->dmaSend(&temp, 65535, 0);
+          _size-=65535;
+        }
+        _SPI->dmaSend(&temp, _size, 0);
+        _SPI->setDataSize (0);
+      //Setup DMA to send the same byte over and over for repeat times
+      } else if(size==1 && repeat > 16){
+        _size=repeat;
+        while(_size > 65535){
+          _SPI->dmaSend(data, 65535, 0);
+          _size-=65535;
+        }
+        _SPI->dmaSend(data, _size, 0);
+      //Don't use DMA for very small transfers, because setting it up takes longer than just writing the bytes out without it
+      } else if(size <= 16){
+        while(repeat--){
+          dataPtr=data;
+          _size=size;
+          while(_size--) {
+           _SPI->transfer(*dataPtr);
+           dataPtr++;
+          }
+        }
+      } else
+      //Finally, use DMA for larger transfers
+      while(repeat--){
+        dataPtr=data;
+        _size=size;
+        while(_size > 65535){
+          _SPI->dmaSend(dataPtr, 65535, 1);
+          dataPtr+=65535;
+          _size-=65535;
+        }
+        _SPI->dmaSend(dataPtr, _size, 1);
+      }
+
+  } else
   #endif
   while(repeat--){
     dataPtr=data;
@@ -807,7 +902,6 @@ else flipDisplay(_vertFlip, true);
 /*
 * Draw lines faster by calculating straight sections and drawing them with fastVline and fastHline.
 */
-
 void Adafruit_ILI9341::drawLine(int16_t x0, int16_t y0,int16_t x1, int16_t y1, uint16_t color)
 {
 	if ((y0 < 0 && y1 <0) || (y0 > _height && y1 > _height)) return;
