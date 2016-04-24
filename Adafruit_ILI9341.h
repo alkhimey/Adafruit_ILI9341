@@ -94,6 +94,8 @@
 
 #define ILI9341_GMCTRP1 0xE0
 #define ILI9341_GMCTRN1 0xE1
+
+#define ILI9341_SCRLSA  0x37
 /*
 #define ILI9341_PWCTR6  0xFC
 
@@ -120,6 +122,11 @@
 #define ILI9341_GREENYELLOW 0xAFE5      /* 173, 255,  47 */
 #define ILI9341_PINK        0xF81F
 
+#define DISPLAY_SCROLL_LEFT 1
+#define DISPLAY_SCROLL_RIGHT 2
+#define DISPLAY_SCROLL_UP 3
+#define DISPLAY_SCROLL_DOWN 4
+
 class Adafruit_ILI9341 : public Adafruit_GFX {
 
  public:
@@ -143,6 +150,12 @@ class Adafruit_ILI9341 : public Adafruit_GFX {
            flipDisplay(bool vertical, bool horizontal),
            flipVertical(),
            flipHorizontal(),
+           scroll(uint8_t direction = DISPLAY_SCROLL_UP, uint16_t pixels = 1, uint16_t fillColor = ILI9341_BLACK, bool doFill = false),
+           //This function doesn't actually move pixels themselves anywhere, it just changes
+           //the internal address the display reads the pixels to be displayed on the TFT from
+           //THIS IS NOT A TRADITIONAL SCROLL
+           hardwareVScroll(uint8_t scrollDirection, uint16_t pixels),
+           powerSaving(bool enable),
            invertDisplay(boolean i);
 
            uint16_t color565(uint8_t r, uint8_t g, uint8_t b);
@@ -167,6 +180,8 @@ class Adafruit_ILI9341 : public Adafruit_GFX {
            SPIClass *_SPI;
            bool _vertFlip=false;
            bool _horzFlip=false;
+           uint16_t _vscroll=0;
+           void setAddrWindow_(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1);
 
            void spiWriteBytes(uint8_t * data, uint32_t size, uint32_t repeat=1);
            inline void spi_begin() __attribute__((always_inline));

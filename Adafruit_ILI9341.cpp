@@ -381,8 +381,14 @@ void Adafruit_ILI9341::begin(void) {
 
 }
 
-
 void Adafruit_ILI9341::setAddrWindow(uint16_t x0, uint16_t y0, uint16_t x1,
+ uint16_t y1) {
+  if(hwSPI) spi_begin();
+  setAddrWindow_(x0, y0, x1, y1);
+  if(hwSPI) spi_end();
+}
+
+void Adafruit_ILI9341::setAddrWindow_(uint16_t x0, uint16_t y0, uint16_t x1,
  uint16_t y1) {
   uint8_t buffC[] = { (uint8_t) (x0 >> 8), (uint8_t) x0, (uint8_t) (x1 >> 8), (uint8_t) x1 };
   uint8_t buffP[] = { (uint8_t) (y0 >> 8), (uint8_t) y0, (uint8_t) (y1 >> 8), (uint8_t) y1 };
@@ -418,7 +424,6 @@ void Adafruit_ILI9341::setAddrWindow(uint16_t x0, uint16_t y0, uint16_t x1,
     spiwrite(buffC[2]);
     spiwrite(buffC[3]);
   }
-  //spiWriteBytes(&buffC[0], sizeof(buffC));
 
   #if defined(USE_FAST_PINIO)
   *dcport &= ~dcpinmask;
@@ -433,8 +438,6 @@ void Adafruit_ILI9341::setAddrWindow(uint16_t x0, uint16_t y0, uint16_t x1,
   #else
   digitalWrite(_dc, HIGH);
   #endif
-
-  *csport &= ~cspinmask;
 
   if(hwSPI){
   #ifdef ESP8266
@@ -452,7 +455,6 @@ void Adafruit_ILI9341::setAddrWindow(uint16_t x0, uint16_t y0, uint16_t x1,
     spiwrite(buffP[2]);
     spiwrite(buffP[3]);
   }
-  //else spiWriteBytes(&buffP[0], sizeof(buffP));
 
   #if defined(USE_FAST_PINIO)
   *dcport &= ~dcpinmask;
@@ -503,7 +505,7 @@ void Adafruit_ILI9341::drawPixel(int16_t x, int16_t y, uint16_t color) {
   if((x < 0) ||(x >= _width) || (y < 0) || (y >= _height)) return;
 
   if (hwSPI) spi_begin();
-  setAddrWindow(x,y,x+1,y+1);
+  setAddrWindow_(x,y,x+1,y+1);
 
 #if defined(USE_FAST_PINIO)
   *dcport |=  dcpinmask;
@@ -536,9 +538,7 @@ void Adafruit_ILI9341::drawFastVLine(int16_t x, int16_t y, int16_t h,
     h = _height-y;
 
   if (hwSPI) spi_begin();
-  setAddrWindow(x, y, x, y+h-1);
-
-  uint8_t hi = color >> 8, lo = color;
+  setAddrWindow_(x, y, x, y+h-1);
 
 #if defined(USE_FAST_PINIO)
   *dcport |=  dcpinmask;
@@ -555,6 +555,9 @@ void Adafruit_ILI9341::drawFastVLine(int16_t x, int16_t y, int16_t h,
     _SPI->dmaSend(&color, h, 0);
     _SPI->setDataSize (0);
   } else
+#elif defined (ESP8266)
+  if(hwSPI) _SPI->writePattern(&colorBin[0], 2, h);
+  else
 #endif
   spiWriteBytes(&colorBin[0], 2, h);
 
@@ -575,9 +578,8 @@ void Adafruit_ILI9341::drawFastHLine(int16_t x, int16_t y, int16_t w,
   if((x >= _width) || (y >= _height)) return;
   if((x+w-1) >= _width)  w = _width-x;
   if (hwSPI) spi_begin();
-  setAddrWindow(x, y, x+w-1, y);
+  setAddrWindow_(x, y, x+w-1, y);
 
-  uint8_t hi = color >> 8, lo = color;
 #if defined(USE_FAST_PINIO)
   *dcport |=  dcpinmask;
   *csport &= ~cspinmask;
@@ -593,6 +595,9 @@ void Adafruit_ILI9341::drawFastHLine(int16_t x, int16_t y, int16_t w,
     _SPI->dmaSend(&color, w, 0);
     _SPI->setDataSize (0);
   } else
+#elif defined (ESP8266)
+  if(hwSPI) _SPI->writePattern(&colorBin[0], 2, w);
+  else
 #endif
   spiWriteBytes(&colorBin[0], 2, w);
 
@@ -618,9 +623,7 @@ void Adafruit_ILI9341::fillRect(int16_t x, int16_t y, int16_t w, int16_t h,
   if((y + h - 1) >= _height) h = _height - y;
 
   if (hwSPI) spi_begin();
-  setAddrWindow(x, y, x+w-1, y+h-1);
-
-  uint8_t hi = color >> 8, lo = color;
+  setAddrWindow_(x, y, x+w-1, y+h-1);
 
 #if defined(USE_FAST_PINIO)
   *dcport |=  dcpinmask;
@@ -642,6 +645,9 @@ void Adafruit_ILI9341::fillRect(int16_t x, int16_t y, int16_t w, int16_t h,
     }
     _SPI->setDataSize (0);
   } else
+#elif defined (ESP8266)
+  if(hwSPI) _SPI->writePattern(&colorBin[0], 2, w*h);
+  else
 #endif
   spiWriteBytes(&colorBin[0], 2, w*h);
 
@@ -1027,14 +1033,12 @@ void Adafruit_ILI9341::pushColors(uint16_t* buf, size_t n, bool littleEndian) {
 #else
     if(littleEndian)
       for(size_t i=0; i<n; i++) { spiwrite(buf[i] >> 8); spiwrite(buf[i]); }
-    else
-      for(size_t i=0; i<n; i++) { spiwrite(buf[i]); spiwrite(buf[i] >> 8); }
+    else spiWriteBytes((uint8_t *)buf, n << 1);
 #endif
   } else {
       if(littleEndian)
         for(size_t i=0; i<n; i++) { spiwrite(buf[i] >> 8); spiwrite(buf[i]); }
-      else
-        for(size_t i=0; i<n; i++) { spiwrite(buf[i]); spiwrite(buf[i] >> 8); }
+      else spiWriteBytes((uint8_t *)buf, n << 1);
     }
 #if defined(USE_FAST_PINIO)
   *csport |= cspinmask;
@@ -1043,6 +1047,49 @@ void Adafruit_ILI9341::pushColors(uint16_t* buf, size_t n, bool littleEndian) {
 #endif
 
   if (hwSPI) spi_end();
+}
+
+//This function doesn't actually move pixels themselves anywhere, it just changes
+//the internal address the display reads the pixels to be displayed on the TFT from
+//THIS IS NOT A TRADITIONAL SCROLL
+void Adafruit_ILI9341::hardwareVScroll(uint8_t scrollDirection, uint16_t pixels)
+{
+  if(pixels < 1) return;
+  if(pixels > 319) pixels %= 320;
+  switch(scrollDirection){
+  case DISPLAY_SCROLL_DOWN:
+    if(_vscroll < pixels){
+      pixels-=_vscroll;
+      _vscroll=320 - pixels;
+    } else _vscroll-=pixels;
+    break;
+  case DISPLAY_SCROLL_UP:
+    if((_vscroll + pixels) > 319){
+      _vscroll=_vscroll + pixels - 320;
+    } else _vscroll+=pixels;
+    break;
+  default:
+    return;
+  }
+  if (hwSPI) spi_begin();
+  writecommand(ILI9341_SCRLSA);
+  writedata(_vscroll >> 8);
+  writedata(_vscroll);
+  if (hwSPI) spi_end();
+}
+
+//This is a traditional scroll in the sense that it actually moves the pixels themselves around
+void Adafruit_ILI9341::scroll(uint8_t scrollDirection, uint16_t pixels, uint16_t fillColor, bool doFill)
+{
+//TO BE DONE
+}
+
+void Adafruit_ILI9341::powerSaving(bool enable)
+{
+  if (hwSPI) spi_begin();
+  writecommand(enable ? ILI9341_SLPIN : ILI9341_SLPOUT);
+  if (hwSPI) spi_end();
+  delay(120);
 }
 
 /*
