@@ -175,6 +175,10 @@ class Adafruit_ILI9341 : public Adafruit_GFX {
     int8_t  _cs, _dc, _rst, _mosi, _miso, _sclk;
 #elif defined (ESP8266)
     int32_t  _cs, _dc, _rst, _mosi, _miso, _sclk;
+#elif defined (MSP430)
+    uint8_t  _cs, _dc, _rst, _mosi, _miso, _sclk;
+#else
+    #error Adafruit ILI9341 library: The target you are compiling for is not one of the supported trgets
 #endif
 };
 

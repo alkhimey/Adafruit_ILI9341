@@ -20,7 +20,11 @@
   #include <pgmspace.h>
 #endif
 #include <limits.h>
+#ifdef ENERGIA
+#include "pins_energia.h"
+#else
 #include "pins_arduino.h"
+#endif
 #include "wiring_private.h"
 #include <SPI.h>
 
@@ -91,7 +95,7 @@ void Adafruit_ILI9341::spiwrite(uint8_t c) {
     SPI.transfer(c);
 #endif
   } else {
-#if defined(ESP8266) || defined (ARDUINO_ARCH_ARC32)
+#if defined(ESP8266) || defined(MSP430) || defined (ARDUINO_ARCH_ARC32)
     for(uint8_t bit = 0x80; bit; bit >>= 1) {
       if(c & bit) {
 	digitalWrite(_mosi, HIGH); 
@@ -216,6 +220,9 @@ void Adafruit_ILI9341::begin(void) {
 #ifndef SPI_HAS_TRANSACTION
     SPI.setBitOrder(MSBFIRST);
     SPI.setDataMode(SPI_MODE0);
+
+
+
   #if defined (_AVR__)
     SPI.setClockDivider(SPI_CLOCK_DIV2); // 8 MHz (full! speed!)
     mySPCR = SPCR;
@@ -223,6 +230,8 @@ void Adafruit_ILI9341::begin(void) {
     SPI.setClockDivider(SPI_CLOCK_DIV2); // 8 MHz (full! speed!)
   #elif defined (__arm__)
     SPI.setClockDivider(11); // 8-ish MHz (full! speed!)
+  #elif defined(MSP430)
+    SPI.setClockDivider(SPI_CLOCK_DIV2); // 8 MHz assuming 16Mhz board is chosen 
   #endif
 #endif
   } else {
@@ -307,7 +316,7 @@ void Adafruit_ILI9341::begin(void) {
   writedata(0x10);   //SAP[2:0];BT[3:0] 
  
   writecommand(ILI9341_VMCTR1);    //VCM control 
-  writedata(0x3e); //¶Ô±È¶Èµ÷½Ú
+  writedata(0x3e); 
   writedata(0x28); 
   
   writecommand(ILI9341_VMCTR2);    //VCM control2 

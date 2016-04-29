@@ -18,13 +18,29 @@
 #include "Adafruit_GFX.h"
 #include "Adafruit_ILI9341.h"
 
+#ifdef ENERGIA
+void yield() {}
+#endif
+
 // For the Adafruit shield, these are the default.
+#ifdef MSP430
+#define TFT_DC P2_1
+#define TFT_CS P2_2
+#else
 #define TFT_DC 9
 #define TFT_CS 10
-
+#endif
 // Use hardware SPI (on Uno, #13, #12, #11) and the above for CS/DC
 Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC);
+
 // If using the breakout, change pins as desired
+#ifdef MSP430 // Beware, software SPI is too slow
+//#define TFT_MOSI P1_7
+//#define TFT_CLK  P1_5
+//#define TFT_MISO P1_6
+//#define TFT_RST  0    // None
+#endif
+
 //Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC, TFT_MOSI, TFT_CLK, TFT_RST, TFT_MISO);
 
 void setup() {
@@ -123,6 +139,11 @@ unsigned long testFillScreen() {
 }
 
 unsigned long testText() {
+#if defined(__MSP430G2553) // MSP430G2553 does not have enough ROM, so sketch size needs to be reduced 
+                           // Notice that 2231 and 22452 has even lower ROM sizes, one will need to
+                           // reduce sketch size further.
+  #warning Compiling without testText to reduce sketch size below 16kb
+#else
   tft.fillScreen(ILI9341_BLACK);
   unsigned long start = micros();
   tft.setCursor(0, 0);
@@ -147,6 +168,7 @@ unsigned long testText() {
   tft.println("with my blurglecruncheon,");
   tft.println("see if I don't!");
   return micros() - start;
+#endif
 }
 
 unsigned long testLines(uint16_t color) {
