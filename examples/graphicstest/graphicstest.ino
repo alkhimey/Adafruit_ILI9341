@@ -22,6 +22,11 @@
 void yield() {}
 #endif
 
+// Temporary fix for msp432 
+#define min(a,b) ((a)<(b)?(a):(b))
+#define max(a,b) ((a)>(b)?(a):(b))
+
+
 // For the Adafruit shield, these are the default.
 #ifdef MSP430
 #define TFT_DC P2_1

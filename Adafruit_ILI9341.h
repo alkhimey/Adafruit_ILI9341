@@ -31,7 +31,10 @@
 
 
 #if defined (__AVR__) || defined(TEENSYDUINO) || defined (__arm__)
+// Temoporary fix for Energia and msp432
+#ifndef ENERGIA
 #define USE_FAST_PINIO
+#endif
 #endif
 
 #define ILI9341_TFTWIDTH  240
@@ -168,7 +171,7 @@ class Adafruit_ILI9341 : public Adafruit_GFX {
 //    int32_t  _cs, _dc, _rst, _mosi, _miso, _sclk;
 //    PORT_OUT_Type  mosipinmask, clkpinmask, cspinmask, dcpinmask;
 #elif defined (__arm__)
-    volatile RwReg *mosiport, *clkport, *dcport, *rsport, *csport;
+    volatile uint32_t *mosiport, *clkport, *dcport, *rsport, *csport;
     int32_t  _cs, _dc, _rst, _mosi, _miso, _sclk;
     uint32_t  mosipinmask, clkpinmask, cspinmask, dcpinmask;
 #elif defined (ARDUINO_ARCH_ARC32)
