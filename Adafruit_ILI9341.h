@@ -16,6 +16,10 @@
 #ifndef _ADAFRUIT_ILI9341H_
 #define _ADAFRUIT_ILI9341H_
 
+#ifndef _WERECATF_DISPLAY_EXTENSIONS_
+#define _WERECATF_DISPLAY_EXTENSIONS_
+#endif
+
 #if ARDUINO >= 100
  #include "Arduino.h"
  #include "Print.h"
@@ -29,8 +33,9 @@
   #include <pgmspace.h>
 #endif
 
+#include <SPI.h>
 
-#if defined (__AVR__) || defined(TEENSYDUINO) || defined (__arm__)
+#if defined (__AVR__) || defined(TEENSYDUINO) || defined (__arm__) || defined (ESP8266) || defined (__STM32F1__)
 #define USE_FAST_PINIO
 #endif
 
@@ -89,6 +94,8 @@
 
 #define ILI9341_GMCTRP1 0xE0
 #define ILI9341_GMCTRN1 0xE1
+
+#define ILI9341_SCRLSA  0x37
 /*
 #define ILI9341_PWCTR6  0xFC
 
@@ -115,17 +122,23 @@
 #define ILI9341_GREENYELLOW 0xAFE5      /* 173, 255,  47 */
 #define ILI9341_PINK        0xF81F
 
+#define DISPLAY_SCROLL_LEFT 1
+#define DISPLAY_SCROLL_RIGHT 2
+#define DISPLAY_SCROLL_UP 3
+#define DISPLAY_SCROLL_DOWN 4
+
 class Adafruit_ILI9341 : public Adafruit_GFX {
 
  public:
 
   Adafruit_ILI9341(int8_t _CS, int8_t _DC, int8_t _MOSI, int8_t _SCLK,
 		   int8_t _RST, int8_t _MISO);
-  Adafruit_ILI9341(int8_t _CS, int8_t _DC, int8_t _RST = -1);
+  Adafruit_ILI9341(int8_t _CS, int8_t _DC, int8_t _RST = -1, SPIClass *SPIdev=&SPI);
 
   void     begin(void),
            setAddrWindow(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1),
            pushColor(uint16_t color),
+           pushColors(uint16_t* buf, size_t n, bool littleEndian=true),
            fillScreen(uint16_t color),
            drawPixel(int16_t x, int16_t y, uint16_t color),
            drawFastVLine(int16_t x, int16_t y, int16_t h, uint16_t color),
@@ -133,28 +146,46 @@ class Adafruit_ILI9341 : public Adafruit_GFX {
            fillRect(int16_t x, int16_t y, int16_t w, int16_t h,
              uint16_t color),
            setRotation(uint8_t r),
+           drawLine(int16_t x0, int16_t y0,int16_t x1, int16_t y1, uint16_t color),
+           flipDisplay(bool vertical, bool horizontal),
+           flipVertical(),
+           flipHorizontal(),
+           scroll(uint8_t direction = DISPLAY_SCROLL_UP, uint16_t pixels = 1, uint16_t fillColor = ILI9341_BLACK, bool doFill = false),
+           //This function doesn't actually move pixels themselves anywhere, it just changes
+           //the internal address the display reads the pixels to be displayed on the TFT from
+           //THIS IS NOT A TRADITIONAL SCROLL
+           hardwareVScroll(uint8_t scrollDirection, uint16_t pixels),
+           powerSaving(bool enable),
            invertDisplay(boolean i);
-  uint16_t color565(uint8_t r, uint8_t g, uint8_t b);
 
-  /* These are not for current use, 8-bit protocol only! */
-  uint8_t  readdata(void),
-    readcommand8(uint8_t reg, uint8_t index = 0);
-  /*
-  uint16_t readcommand16(uint8_t);
-  uint32_t readcommand32(uint8_t);
-  void     dummyclock(void);
-  */
+           uint16_t color565(uint8_t r, uint8_t g, uint8_t b);
 
-  void     spiwrite(uint8_t),
-    writecommand(uint8_t c),
-    writedata(uint8_t d),
-    commandList(uint8_t *addr);
-  uint8_t  spiread(void);
+           /* These are not for current use, 8-bit protocol only! */
+           uint8_t readdata(void),
+           readcommand8(uint8_t reg, uint8_t index = 0);
+           /*
+           uint16_t readcommand16(uint8_t);
+           uint32_t readcommand32(uint8_t);
+           void     dummyclock(void);
+           */
+
+           void spiwrite(uint8_t),
+           writecommand(uint8_t c),
+           writedata(uint8_t d),
+           commandList(uint8_t *addr);
+           uint8_t  spiread(void);
 
  private:
-  uint8_t  tabcolor;
+           uint8_t  tabcolor;
+           SPIClass *_SPI;
+           bool _vertFlip=false;
+           bool _horzFlip=false;
+           uint16_t _vscroll=0;
+           void setAddrWindow_(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1);
 
-
+           void spiWriteBytes(uint8_t * data, uint32_t size, uint32_t repeat=1);
+           inline void spi_begin() __attribute__((always_inline));
+           inline void spi_end() __attribute__((always_inline));
 
   boolean  hwSPI;
 #if defined (__AVR__) || defined(TEENSYDUINO)
@@ -167,14 +198,16 @@ class Adafruit_ILI9341 : public Adafruit_GFX {
 //    volatile PORT_OUT_Type *mosiport, *clkport, *dcport, *rsport, *csport;
 //    int32_t  _cs, _dc, _rst, _mosi, _miso, _sclk;
 //    PORT_OUT_Type  mosipinmask, clkpinmask, cspinmask, dcpinmask;
+#elif defined (ESP8266) || defined (__STM32F1__)
+    volatile uint32_t *mosiport, *clkport, *dcport, *rsport, *csport;
+    int32_t  _cs, _dc, _rst, _mosi, _miso, _sclk;
+    uint32_t  mosipinmask, clkpinmask, cspinmask, dcpinmask;
 #elif defined (__arm__)
     volatile RwReg *mosiport, *clkport, *dcport, *rsport, *csport;
     int32_t  _cs, _dc, _rst, _mosi, _miso, _sclk;
     uint32_t  mosipinmask, clkpinmask, cspinmask, dcpinmask;
 #elif defined (ARDUINO_ARCH_ARC32)
     int8_t  _cs, _dc, _rst, _mosi, _miso, _sclk;
-#elif defined (ESP8266)
-    int32_t  _cs, _dc, _rst, _mosi, _miso, _sclk;
 #endif
 };
 
